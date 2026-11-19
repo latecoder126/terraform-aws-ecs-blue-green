@@ -1,7 +1,10 @@
+
 # Client build stage
 FROM --platform=linux/amd64 public.ecr.aws/docker/library/node:26-alpine AS client-builder
 
 WORKDIR /app/client
+
+RUN corepack enable
 
 COPY client/package.json client/yarn.lock ./
 RUN yarn install --frozen-lockfile --ignore-scripts
@@ -13,6 +16,8 @@ RUN yarn build
 FROM --platform=linux/amd64 public.ecr.aws/docker/library/node:26-alpine AS server
 
 WORKDIR /app
+
+RUN corepack enable
 
 COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile --ignore-scripts
