@@ -1,0 +1,40 @@
+{
+  "name": "project_test_repo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "frontend-install": "cd client && yarn install",
+    "frontend-build": "cd client && yarn build",
+    "all-install": "concurrently \"yarn install\" \"yarn frontend-install\" \"yarn frontend-build \"",
+    "start": "node index.js",
+    "test": "jest"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "aws-xray-sdk": "^3.9.0",
+    "concurrently": "^10.0.0",
+    "express": "^5.0.0",
+    "express-rate-limit": "^8.7.1"
+  },
+  "devDependencies": {
+    "jest": "^30.0.0",
+    "supertest": "^7.0.0"
+  },
+  "jest": {
+    "collectCoverageFrom": [
+      "index.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "lines": 80
+      }
+    }
+  },
+  "resolutions": {
+    "proxy-addr": "^2.0.8",
+    "**/js-yaml/argparse": "^3.0.0",
+    "shell-quote": "^1.11.0"
+  }
+}

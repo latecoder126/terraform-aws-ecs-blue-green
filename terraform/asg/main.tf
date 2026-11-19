@@ -1,0 +1,104 @@
+# Instance profile
+
+resource "aws_iam_instance_profile" "ecs_node" {
+  name = "${var.name}-node-profile"
+  role = var.ecs_instance_role_name
+}
+
+
+# Launch template
+
+resource "aws_launch_template" "ecs_ec2" {
+  name                   = "${var.name}-launch-template"
+  image_id               = var.asg_ec2_image_id
+  instance_type          = var.asg_ec2_instance_type
+  vpc_security_group_ids = var.security_group_ids
+
+  metadata_options {
+    http_tokens                 = "required"
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 1
+  }
+
+  iam_instance_profile {
+    arn = aws_iam_instance_profile.ecs_node.arn
+  }
+
+  monitoring {
+    enabled = true
+  }
+
+  # <<-EOF strips the indentation, so #!/bin/bash lands at byte 0 and
+  # cloud-init can exec the script (with <<EOF it fails "Exec format error").
+  # The replace() drops the \r a Windows (core.autocrlf) checkout puts on every
+  # line; without it the shebang reads "/bin/bash\r" and the script never runs.
+  # yum is dnf's alias on Amazon Linux 2023, so the line works on AL2 and AL2023.
+  user_data = base64encode(replace(<<-EOF
+    #!/bin/bash
+    echo ECS_CLUSTER=${var.ecs_cluster_name} >> /etc/ecs/ecs.config;
+    sudo yum update -y
+  EOF
+  , "\r", ""))
+}
+
+
+# Auto Scaling Group
+
+resource "aws_autoscaling_group" "ecs" {
+  name = "${var.name}-ASG"
+
+  min_size                  = var.asg_min_size
+  max_size                  = var.asg_max_size
+  desired_capacity          = var.asg_desired_capacity
+  health_check_grace_period = 60
+  health_check_type         = "EC2"
+  protect_from_scale_in     = false
+  vpc_zone_identifier       = var.private_subnets
+
+  launch_template {
+    id      = aws_launch_template.ecs_ec2.id
+    version = "$Latest"
+  }
+
+  tag {
+    key                 = "Name"
+    value               = var.name
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = "AmazonECSManaged"
+    value               = ""
+    propagate_at_launch = true
+  }
+}
+
+
+# Capacity provider
+
+resource "aws_ecs_capacity_provider" "main" {
+  name = "${var.name}-capacity_provider"
+
+  auto_scaling_group_provider {
+    auto_scaling_group_arn         = aws_autoscaling_group.ecs.arn
+    managed_termination_protection = "DISABLED"
+
+    managed_scaling {
+      maximum_scaling_step_size = 2
+      minimum_scaling_step_size = 1
+      status                    = "ENABLED"
+      target_capacity           = 100
+    }
+  }
+}
+
+resource "aws_ecs_cluster_capacity_providers" "main" {
+  cluster_name       = var.ecs_cluster_name
+  capacity_providers = [aws_ecs_capacity_provider.main.name]
+
+  default_capacity_provider_strategy {
+    capacity_provider = aws_ecs_capacity_provider.main.name
+    base              = 1
+    weight            = 100
+  }
+}

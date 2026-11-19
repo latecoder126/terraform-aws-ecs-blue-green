@@ -1,0 +1,42 @@
+# Terraform files
+.terraform/
+# .terraform.lock.hcl is committed on purpose (pins provider versions + hashes)
+backend.hcl
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+*.tfplan
+tfplan
+tf.*
+
+# Sensitive files
+*.pem
+*.key
+secrets.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+
+# Added for consistency
+.env
+.env.local
+.env.*.local

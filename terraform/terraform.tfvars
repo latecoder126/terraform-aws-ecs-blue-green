@@ -1,0 +1,48 @@
+# AWS Configuration
+aws_region         = "us-east-1"
+availability_zones = ["us-east-1a", "us-east-1b"]
+
+# Project Configuration
+project_name = "blue-green-dep-app"
+
+# VPC Configuration
+vpc_cidr = "10.0.0.0/16"
+
+# ECS Task Definition Configuration
+task_definition_cpu          = 256
+task_definition_memory       = 512
+task_definition_network_mode = "awsvpc"
+
+# Auto Scaling Group Configuration
+asg_ec2_ami_name      = "/aws/service/ecs/optimized-ami/amazon-linux-2023/recommended/image_id"
+asg_ec2_instance_type = "t3.large"
+asg_desired_capacity  = 2
+asg_max_size          = 4
+asg_min_size          = 2
+
+# ECS Service Configuration
+desired_count  = 2
+container_port = 3000
+
+# GitHub Configuration (CodeConnections; the codestar-connections ARN prefix still works)
+github_connection_arn = "arn:aws:codestar-connections:us-east-1:822546254290:connection/9bfb5e94-5865-47b9-9f0a-bf9d9f0ed56e"
+github_owner          = "Sagargupta16"
+github_repo           = "terraform-aws-ecs-blue-green"
+
+# Deployment engine: "codedeploy" (default) or "ecs" for ECS native blue/green
+deployment_engine       = "codedeploy"
+ecs_deployment_strategy = "CANARY"
+canary_percent          = 30
+canary_interval_minutes = 1
+bake_time_minutes       = 1
+
+# Branch Configuration
+main_branch_name = "master"
+dev_branch_name  = "feature/modifications"
+
+# Common Tags Configuration
+common_tags = {
+  Project   = "Blue Green Deployment"
+  ManagedBy = "Terraform"
+  CreatedBy = "Sagar"
+}

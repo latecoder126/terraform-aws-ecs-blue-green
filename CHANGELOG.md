@@ -1,0 +1,146 @@
+# Changelog
+
+## [1.5.1] - 2026-10-25
+
+### Security
+- Test app: body-parser 2.3.0 -> 2.4.0 in `Test_App/yarn.lock` (denial of service via trailing bytes after a compressed request body); qs, iconv-lite and content-type follow its new floors
+
+## [1.5.0] - 2026-10-24
+
+### Security
+- Checkov 3.3.30 on `terraform/`: 70 failed / 292 passed / 6 skipped before, 41 failed / 316 passed / 6 skipped after, with no new findings. That closes 29 of the 76 Checkov alerts in Code Scanning; the rest are listed, with the reason for each, under Known limitations in the README.
+- Every security group rule has a description (CKV_AWS_23).
+- ECS egress is HTTPS only. The task and container-instance group allowed all protocols to `0.0.0.0/0`; it now allows TCP 443, which is all ECR, ECR Public, the ECS agent, CloudWatch Logs, X-Ray, SSM and dnf need (CKV_AWS_382). Security groups do not filter Amazon DNS, instance or task metadata, or the Time Sync Service.
+- The VPC's default security group is managed with no rules (CKV2_AWS_12).
+- VPC flow logs for all traffic go to the `<project>-vpc-flow-logs` log group, encrypted with the project CMK and kept 365 days (`flow_log_retention_days` in the vpc module) (CKV2_AWS_11). The new `<project>-VpcFlowLogsRole` writes only to that group, uses the CMK only through CloudWatch Logs, and only flow logs in this account can assume it. A new key policy statement lets CloudWatch Logs use the CMK for that one log group.
+- Artifact bucket: versioning (CKV_AWS_21), SSE-KMS with the project CMK and a bucket key (CKV_AWS_145), a public access block (CKV2_AWS_6) and a lifecycle rule that expires overwritten versions after 30 days and aborts stale multipart uploads (CKV2_AWS_61).
+- CodeDeploy role scoped to resources: services and task sets on this project's clusters, `ModifyListener` and `ModifyRule` on this project's ALBs, `DescribeAlarms` on its alarms. Only the ELB `Describe*` calls, which have no resource-level permissions, stay on `*` (CKV_AWS_290, CKV_AWS_355).
+- Both containers run with a read-only root filesystem (CKV_AWS_336).
+- Test_App: `express-rate-limit` 8.7.1 at 300 requests a minute per client, with `trust proxy` set to the one ALB hop so it counts clients, not ALB nodes (CodeQL `js/missing-rate-limiting`).
+
+### Changed
+- Upgrading a running stack: the four rules that only gain a description update in place. `ecs_egress` is replaced (protocol and ports force a new rule), so the ECS group has no egress rule for the seconds between the delete and the create. Both task definitions get a new revision; running services keep theirs until the next pipeline deploy, which renders from the new one. The rest is added or updated in place: the artifact bucket's versioning, encryption, public access block and lifecycle, the key policy, the CodeDeploy policy, the flow log with its log group and role, and the default security group.
+- Breaking for custom workloads: a container that calls out on anything but TCP 443 (a database on 5432, SMTP, plain HTTP) needs its own egress rule on the ECS group.
+- Breaking for anything launched into the VPC's default security group by hand: managing that group removes the allow-all rules AWS created.
+- New cost: CloudWatch Logs ingestion and storage for the flow logs (all traffic, 365 days).
+
+### Removed
+- `terraform/codecommit/`, deprecated since 1.0.1 and never called from the root module (CKV2_AWS_37). Anything that sources it directly should pin `bd3b4e5`, the last commit that has it.
+
+### Docs
+- README: the Security section lists the new controls, and Known limitations names every Checkov finding left open and why. `terraform/README.md`, `CLAUDE.md` and the Test_App README follow.
+
+## [1.4.3] - 2026-10-23
+
+### Docs
+- README: redrew both architecture figures with orrery 0.12.0, which draws icons at 64 px instead of 48 px. In `docs/diagrams/pipeline.yaml` the CloudWatch alarms now sit in the row with ECR and the artifact bucket, and the test rollback edge is written from the deploy (`arrow: start`, as the prod one already was), so it no longer runs beside the build's artifact edge. Same nodes, edges and evidence.
+
+## [1.4.2] - 2026-10-21
+
+### Changed
+- Repository renamed from `Blue_Green_AWS_Terraform` to `terraform-aws-ecs-blue-green`, the Terraform Registry naming (`terraform-<provider>-<name>`); GitHub redirects the old URL. `github_repo` in `terraform.tfvars`, the `terraform/README.md` example and `tests/pipelines.tftest.hcl` now name the new repository, so the next `apply` points both CodePipeline sources (through CodeConnections) at it. The `Repository` default tag in `locals.tf`, the README badge and clone commands, and the SECURITY report subject follow. The SonarCloud project key (`Sagargupta16_Blue_Green_AWS_Terraform`) is unchanged.
+
+## [1.4.1] - 2026-10-21
+
+### Docs
+- README: two architecture figures drawn with [orrery](https://github.com/Sagargupta16/orrery) from the Terraform, each in a dark and a light SVG that follow the reader's theme. `docs/diagrams/runtime.yaml` shows one environment: the internet gateway, the ALB in both public subnets with the blue and green target groups, ECS tasks on the EC2 Auto Scaling group in both private subnets, the NAT gateways, ECR, X-Ray, the rollback alarms, the SNS topic and the KMS key. `docs/diagrams/pipeline.yaml` shows both pipelines: GitHub through CodeConnections, CodeBuild, CodeDeploy to test, the manual approval and CodeDeploy to prod, the dev pipeline, ECR, the artifact bucket and alarm rollback. Every node carries the file and line it comes from. The Mermaid flowchart stays, folded under the figures; Project Structure lists `docs/diagrams/`.
+
+## [1.4.0] - 2026-10-18
+
+### Added
+- ECS native blue/green as a second engine: `deployment_engine = "ecs"` switches each service to the `ECS` controller with the `CANARY` (30% for 1 min, default) or `BLUE_GREEN` strategy, a bake time, the deployment circuit breaker and alarm rollback. It adds weighted listener rules on `:80`/`:8080`, the ECS infrastructure role (`AmazonECSInfrastructureRolePolicyForLoadBalancers`) and the CodePipeline ECS deploy action, and drops every CodeDeploy resource. `deployment_engine = "codedeploy"` stays the default; the CodeDeploy resources gained `count` with `moved` blocks, so existing state keeps its addresses.
+- Rollback alarms per environment: `<env>-Target-5XX` (>= 5 target 5xx a minute) and `<env>-Unhealthy-Hosts` (worst of blue and green, 2 minutes). CodeDeploy watches them through `alarm_configuration` and `DEPLOYMENT_STOP_ON_ALARM`; the `ecs` engine through the service `alarms` block. Every alarm, including the CPU reservation alarm that had `alarm_actions = []`, notifies a CMK-encrypted SNS topic; `alarm_email` subscribes an address.
+- Remote state: partial `backend "s3" {}` with `use_lockfile` (no DynamoDB) and a `terraform/bootstrap/` root module that creates a versioned, SSE-KMS, public-access-blocked, TLS-only state bucket with `prevent_destroy`, plus an SSE-S3 access-log bucket that records every state read and write (log delivery scoped to the state bucket and account, logs kept 365 days by default via `access_log_days`). `.terraform.lock.hcl` is now committed for both root modules, with hashes for linux, darwin and windows.
+- `terraform test` suite (`terraform/tests/`, 21 runs) on mocked providers: both engines from the root, variable validation, the ECS service wiring, CodeDeploy alarm rollback, pipeline deploy actions, IAM grants per engine, listener rules, and the user-data shebang; plus 3 runs in `terraform/bootstrap/tests/` for the state bucket.
+- CI jobs: `terraform test`, tflint 0.64 with the AWS ruleset (root and bootstrap), the Test_App coverage gate and client build, and the deploy-artifact renderer tests.
+- New inputs: `deployment_engine`, `ecs_deployment_strategy`, `canary_percent`, `canary_interval_minutes`, `bake_time_minutes`, `alarm_email`. The CodeDeploy canary reads the same values instead of hardcoded 30 / 1.
+
+### Changed
+- Deploys are pinned to the image digest. The buildspec tags images `<env>-<git sha>`, and [`scripts/render-deploy-artifacts.sh`](scripts/render-deploy-artifacts.sh) writes `taskdef.json` (from the Terraform-registered task definition, app image set to `<IMAGE1_NAME>`), `imageDetail.json`, `appspec.yml` (`<TASK_DEFINITION>`) and `imagedefinitions.json` with `repo@sha256:...`. The deploy action is now `CodeDeployToECS` (or `ECS`), which registers a task-definition revision per build, so test and prod run the image the build tested even if a newer build lands while prod waits for approval. The script refuses a mutable tag or an unknown container; 17 checks in `scripts/tests/`.
+- Tests and the coverage gate run before `docker build`, and `on-failure: ABORT` on the pre_build and build phases keeps CodeBuild out of post_build, so an image that failed its tests is never pushed (before, post_build ran after a failed build phase and pushed `:<env>-latest`).
+- Container-instances use the Amazon Linux 2023 ECS-optimized AMI (AL2 reached end of support on 2026-06-30) and `t3.large` instead of `t2.large`.
+- CodeConnections naming: the pipeline role allows `codeconnections:UseConnection` and `codestar-connections:UseConnection`, scoped to the one connection ARN instead of `*`.
+- Pipeline role: `ecs:RegisterTaskDefinition`, `ecs:DescribeTaskDefinition`, `ecs:TagResource` (on `RegisterTaskDefinition` only), PassRole for both task roles, and `ecs:UpdateService` on this project's clusters only with the `ecs` engine. CodeBuild role: `ecs:DescribeTaskDefinition`.
+- The KMS key has an explicit policy: the default account statement plus CloudWatch, so alarms can publish to the encrypted topics.
+- Terraform `required_version` is now `>= 1.10.0` (S3 `use_lockfile`).
+- Breaking for local runs: with the partial S3 backend, a plain `terraform init` in `terraform/` now prompts for a bucket. Run `terraform init -backend-config=backend.hcl` (add `-migrate-state` once if you have a local `terraform.tfstate`), or `terraform init -backend=false` for validate and test only.
+- Checkov 3.3.29 on `terraform/`: 71 failed / 233 passed before, 70 failed / 292 passed / 6 skipped after. The KMS key policy clears CKV2_AWS_64. The bootstrap module has 0 failures (42 passed, 6 skipped with an inline reason): 2 skips on the state bucket (replication, event notifications) and 4 on the access-log bucket (logging to itself, replication, KMS, which S3 log delivery does not support, event notifications).
+
+### Fixed
+- Listeners ignore `default_action`. CodeDeploy points them at the green target group on every deployment, and the next `terraform apply` used to point traffic back at a target group that could have no tasks.
+- User data strips `\r`. On a Windows checkout (`core.autocrlf=true`) the heredoc carried CRLF, the shebang read `/bin/bash\r`, and the script that writes `ECS_CLUSTER` could not run. Caught by the new `asg` test; `.gitattributes` keeps `*.sh` LF for the same reason.
+
+### Docs
+- README: both engines in the architecture and sequence diagrams, how to switch an existing stack to `ecs`, remote-state setup and migration, what the test suites cover, updated design decisions, configuration table, monitoring, troubleshooting and known limitations (mutable-tag and AL2 entries resolved). `terraform/README.md` and `CLAUDE.md` follow.
+
+## [1.3.1] - 2026-10-18
+
+### Fixed
+- Launch-template user data used `<<EOF` with an indented body, so the script started with four spaces before `#!/bin/bash` and cloud-init could not exec it ("Exec format error"); `ECS_CLUSTER` was never written and instances would join the `default` cluster. Now `<<-EOF`, which strips the indent.
+- The CodeBuild 80% coverage gate never fired: Jest prints coverage without a `%` sign, so the `grep -Po '...(?=%)'` matched nothing, `[ "" -lt 80 ]` errored, and the `if` fell through. The test file also rebuilt its own copy of the Express app, so `index.js` coverage was 0%. Tests now import the real app, Jest enforces `coverageThreshold` (80% lines, currently 81.8%) and the buildspecs run `yarn test --coverage` once instead of twice.
+- `Test_App/index.js` exports the app, starts the server only when run directly and honours `PORT` (the README already documented it).
+- X-Ray daemon sidecar now pulls `public.ecr.aws/xray/aws-xray-daemon:latest` instead of the untagged Docker Hub image, avoiding the Docker Hub rate limit already fixed for the Node base image in 1.0.1.
+
+### Security
+- Dockerfile installs with `yarn install --frozen-lockfile --ignore-scripts` (SonarCloud docker:S6505, docker:S8543); `index.js` uses `const` and `node:http` (javascript:S3504, S7772).
+
+### Docs
+- README: mermaid architecture and deployment-sequence diagrams, design-decisions table, known-limitations section (mutable image tags, AL2 end of support, public test listener, no HTTPS), real clone URL, six IAM roles (not five), Node 20.19+ for Vite 8, Checkov runs with `soft_fail`, branch names in tfvars do not exist in this repo, troubleshooting no longer suggests setting `privileged_mode` (already on).
+- Test_App README: drops the non-existent `/health` endpoint, lists the real routes and the coverage threshold, Node prerequisite corrected from 14 to 20.19+.
+- Client `index.html` title and description no longer say Create React App.
+
+## [1.3.0] - 2026-10-13
+
+### Changed
+- Test_App client moved from Create React App (react-scripts 5) to Vite 8. Output stays in `client/build`, so `index.js`, the Dockerfile and buildspec are unchanged; the CRA `resolutions` block and boilerplate README are gone.
+
+### Security
+- Clears all 10 open Dependabot alerts: 9 came only through react-scripts (webpack-dev-server x6, braces, node-forge, sprintf-js); the server-side sprintf-js (jest -> js-yaml 3 -> argparse 1) is cut by resolving js-yaml's argparse to 2.0.1, which only its CLI uses.
+- Resolve shell-quote to ^1.11.0 for a critical advisory published 2026-10-13 (via concurrently). `yarn audit` reports 0 in both Test_App and client.
+
+## [1.2.0] - 2026-05-03
+
+### Security / IAM
+- Scoped the CodePipeline role to the services it actually uses; removed `ec2:*`, `s3:*`, `ecs:*`, `autoscaling:*`, `elasticloadbalancing:*`, `cloudwatch:*`, `opsworks:*`, `devicefarm:*`, `servicecatalog:*`, `states:*`, `appconfig:*` wildcard grants.
+- Split the ECS task identity into **two distinct roles**: `EcsTaskExecutionRole` (image pull + log write) and `EcsTaskRole` (application runtime identity). The task role is now scoped to `AWSXrayWriteOnlyAccess`.
+- Replaced the deprecated `inline_policy {}` block with separate `aws_iam_role_policy` resources on every role.
+- Narrowed CloudWatch Logs access on the execution role from `CloudWatchLogsFullAccess` to account-scoped `logs:*` actions.
+- Scoped CodeBuild report-group and ECR push actions to account-scoped ARNs.
+
+### Tagging
+- Introduced `provider.default_tags` — every taggable resource now inherits the project tag set automatically.
+- Removed all per-resource `tags =` arguments and all 15 unused `variable "tags"` module declarations. The `aws_autoscaling_group`'s two `tag {}` (singular) blocks remain because AWS requires them.
+
+### CI / tooling
+- Added `.github/workflows/security-and-terraform.yml` — runs `terraform fmt -check -recursive` + `terraform validate`, AWS ASH (Docker container, findings uploaded as an artifact), and Checkov (SARIF uploaded to GitHub Code Scanning) on every push and PR.
+
+### ECS service
+- Added explicit `deployment_maximum_percent = 200` and `deployment_minimum_healthy_percent = 100` on the service to guarantee zero-downtime task rebalancing outside of CodeDeploy-driven deployments.
+
+### Code quality
+- Restructured all 33 `.tf` files with consistent `# Section` headings and one-line descriptions; trimmed verbose banner comments. Terraform codebase down ~27 % (≈ 2,800 → 2,032 lines).
+- Removed redundant `depends_on` arguments that duplicated implicit module-output references.
+
+### Docs
+- Corrected README: ECS-on-EC2 (not Fargate), MIT license (not ISC), accurate variable defaults (`us-east-1`, `blue-green-dep-app`), Node.js >= 18, correct module directory name (`task_definition/`).
+
+## [1.1.0] - 2026-02-28
+
+- Configure Renovate for monthly grouped dependency updates
+
+## [1.0.1] - 2025-07-26
+
+- Swap ALB target groups to balance traffic between target_group1 and target_group2
+- Add pipeline webhook triggers for automatic GitHub push detection
+- Fix Docker Hub rate limit by using ECR Public Gallery for Node.js images
+- Migrate from CodeCommit to GitHub: update pipeline configs, IAM roles, variables
+- Update README for improved clarity
+
+## [1.0.0] - 2025-07-26
+
+- Initial blue-green deployment pipeline on AWS
+- Terraform modules: VPC (2 AZ), ECS, ALB, CodePipeline, CodeBuild, CodeDeploy
+- Canary deployment (30% for 1 min, then full cutover)
+- Multi-environment pipeline: Dev, Test, Manual approval, Prod
+- Express + React test app with Docker multi-stage build
+- Jest + Supertest with 80% coverage gate
