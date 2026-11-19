@@ -28,6 +28,6 @@ COPY --from=client-builder /app/client/build ./client/build
 RUN chown -R node:node /app
 USER node
 
-EXPOSE 8080
+EXPOSE 3000
 
 CMD ["node", "index.js"]
