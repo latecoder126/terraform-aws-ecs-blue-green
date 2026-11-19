@@ -1,10 +1,3 @@
-# Data sources
-
-data "aws_kms_alias" "kmskey" {
-  name = var.kms_key_alias
-}
-
-
 # Repository
 
 resource "aws_ecr_repository" "repo" {
@@ -18,6 +11,6 @@ resource "aws_ecr_repository" "repo" {
 
   encryption_configuration {
     encryption_type = "KMS"
-    kms_key         = data.aws_kms_alias.kmskey.arn
+    kms_key         = var.kms_key_arn
   }
 }

@@ -8,8 +8,8 @@ variable "pipeline_role_arn" {
   type        = string
 }
 
-variable "kms_key_alias" {
-  description = "KMS key alias for artifact encryption."
+variable "kms_key_arn" {
+  description = "KMS key ARN for artifact encryption."
   type        = string
 }
 

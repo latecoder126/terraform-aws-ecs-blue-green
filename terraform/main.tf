@@ -21,9 +21,9 @@ module "kms" {
 }
 
 module "ecr" {
-  source        = "./ecr"
-  name          = var.project_name
-  kms_key_alias = module.kms.kms_key_alias
+  source      = "./ecr"
+  name        = var.project_name
+  kms_key_arn = module.kms.kms_key_arn
 }
 
 module "iam" {
@@ -82,7 +82,7 @@ module "codebuild_dev" {
   task_definition_arn = module.task_definition_dev.task_definition_arn
   container_name      = module.task_definition_dev.container_name
   container_port      = var.container_port
-  aws_kms_alias       = module.kms.kms_key_alias
+  kms_key_arn         = module.kms.kms_key_arn
 }
 
 module "codebuild_main" {
@@ -95,7 +95,7 @@ module "codebuild_main" {
   task_definition_arn = module.task_definition_main.task_definition_arn
   container_name      = module.task_definition_main.container_name
   container_port      = var.container_port
-  aws_kms_alias       = module.kms.kms_key_alias
+  kms_key_arn         = module.kms.kms_key_arn
 }
 
 
@@ -204,7 +204,7 @@ module "codepipeline_dev" {
   dev_codebuild_project_name = module.codebuild_dev.codebuild_project_name
   dev_codedeploy_app_name    = module.codedeploy_dev.codedeploy_app_name
   dev_deployment_group_name  = module.codedeploy_dev.codedeploy_deployment_group_name
-  kms_key_alias              = module.kms.kms_key_alias
+  kms_key_arn                = module.kms.kms_key_arn
   deployment_engine          = var.deployment_engine
   dev_ecs_cluster_name       = module.codedeploy_dev.ecs_cluster_name
   dev_ecs_service_name       = module.codedeploy_dev.ecs_service_name
@@ -224,7 +224,7 @@ module "codepipeline_main" {
   test_deployment_group_name  = module.codedeploy_test.codedeploy_deployment_group_name
   prod_codedeploy_app_name    = module.codedeploy_prod.codedeploy_app_name
   prod_deployment_group_name  = module.codedeploy_prod.codedeploy_deployment_group_name
-  kms_key_alias               = module.kms.kms_key_alias
+  kms_key_arn                 = module.kms.kms_key_arn
   deployment_engine           = var.deployment_engine
   test_ecs_cluster_name       = module.codedeploy_test.ecs_cluster_name
   test_ecs_service_name       = module.codedeploy_test.ecs_service_name

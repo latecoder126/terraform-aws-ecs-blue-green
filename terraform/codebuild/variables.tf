@@ -3,6 +3,11 @@ variable "name" {
   type        = string
 }
 
+variable "kms_key_arn" {
+  description = "KMS key ARN for CodeBuild artifact encryption."
+  type        = string
+}
+
 variable "aws_region" {
   description = "Region injected as AWS_DEFAULT_REGION."
   type        = string
@@ -15,11 +20,6 @@ variable "build_env" {
 
 variable "codebuild_role_arn" {
   description = "CodeBuild service role ARN."
-  type        = string
-}
-
-variable "aws_kms_alias" {
-  description = "KMS key alias for artifact encryption."
   type        = string
 }
 

@@ -8,7 +8,7 @@ mock_provider "aws" {
 
 variables {
   pipeline_role_arn     = "arn:aws:iam::111122223333:role/test-app-CodepipelineRole"
-  kms_key_alias         = "alias/test-app-kms-key"
+  kms_key_arn           = "arn:aws:kms:us-east-1:111122223333:key/00000000-0000-0000-0000-000000000000"
   github_connection_arn = "arn:aws:codeconnections:us-east-1:111122223333:connection/00000000-0000-0000-0000-000000000000"
   github_owner          = "Sagargupta16"
   github_repo           = "terraform-aws-ecs-blue-green"

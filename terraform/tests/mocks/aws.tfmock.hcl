@@ -8,13 +8,6 @@ mock_data "aws_caller_identity" {
   }
 }
 
-mock_data "aws_kms_alias" {
-  defaults = {
-    arn            = "arn:aws:kms:us-east-1:111122223333:alias/mock"
-    target_key_arn = "arn:aws:kms:us-east-1:111122223333:key/00000000-0000-0000-0000-000000000000"
-  }
-}
-
 mock_data "aws_ssm_parameter" {
   defaults = {
     value = "ami-0123456789abcdef0"

@@ -87,7 +87,6 @@ clusters, two CodePipelines) in a single `terraform apply`.
 | aws_vpc                               | resource |
 | random_pet                            | resource |
 | aws_caller_identity                   | data source |
-| aws_kms_alias                         | data source |
 | aws_region                            | data source |
 | aws_ssm_parameter                     | data source |
 

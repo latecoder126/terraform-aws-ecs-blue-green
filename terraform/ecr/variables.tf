@@ -3,7 +3,7 @@ variable "name" {
   type        = string
 }
 
-variable "kms_key_alias" {
-  description = "KMS key alias for image encryption."
+variable "kms_key_arn" {
+  description = "KMS key ARN for image encryption."
   type        = string
 }

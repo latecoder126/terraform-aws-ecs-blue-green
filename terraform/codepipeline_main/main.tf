@@ -45,13 +45,6 @@ locals {
 }
 
 
-# Data sources
-
-data "aws_kms_alias" "kmskey" {
-  name = var.kms_key_alias
-}
-
-
 # Pipeline (Source -> Build -> Deploy-Test -> Approval -> Deploy-Prod)
 
 resource "aws_codepipeline" "main" {
@@ -64,7 +57,7 @@ resource "aws_codepipeline" "main" {
     location = var.artifact_bucket
 
     encryption_key {
-      id   = data.aws_kms_alias.kmskey.arn
+      id   = var.kms_key_arn
       type = "KMS"
     }
   }

@@ -1,16 +1,9 @@
-# Data sources
-
-data "aws_kms_alias" "kmskey" {
-  name = var.aws_kms_alias
-}
-
-
 # CodeBuild project
 
 resource "aws_codebuild_project" "build" {
   name           = "${var.name}-CodeBuild"
   service_role   = var.codebuild_role_arn
-  encryption_key = data.aws_kms_alias.kmskey.arn
+  encryption_key = var.kms_key_arn
 
   source {
     type      = "CODEPIPELINE"

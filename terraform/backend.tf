@@ -10,5 +10,9 @@
 # so it never needs the bucket.
 
 terraform {
-  backend "s3" {}
+  backend "s3" {
+    bucket = "blue-green-dep-app-tfstate-448774597228"
+    key    = "terraform.tfstate"
+    region = "ap-southeast-2"
+  }
 }
